@@ -2,6 +2,7 @@ using System;
 using Newtonsoft.Json.Linq;
 using System.Net;
 using System.IO;
+using System.Reflection;
 
 namespace fuzzer
 {
@@ -9,11 +10,50 @@ namespace fuzzer
 	{
 		public static void Main (string[] args)
 		{
-			JObject obj = new JObject ();
-			obj ["method"] = "create";
-			obj ["username"] = "fdsa'";
-			obj ["password"] = "password";
+			Assembly asm = Assembly.GetExecutingAssembly ();
+
+			string json = string.Empty;
+			using (StreamReader rdr = new StreamReader(asm.GetManifestResourceStream("fuzzer.CreateUser.json")))
+				json = rdr.ReadToEnd ();
+
+			JObject obj = JObject.Parse (json);
+
+			foreach (var pair in (JObject)obj.DeepClone()) {
+				if (pair.Value.Type != JTokenType.String && pair.Value.Type != JTokenType.Object) {
+					Console.WriteLine("Skipping JSON key: " + pair.Key);
+					continue;
+				}
+
+				if (pair.Value.Type == JTokenType.String) {
+					Console.WriteLine("Fuzzing key: " + pair.Key);
+					string oldVal = (string)pair.Value;
+					obj[pair.Key] = "fd'sa";
+
+					if (Fuzz(obj))
+						Console.WriteLine("SQL injection vector: " + pair.Key);
+
+					obj[pair.Key] = oldVal;
+				}
+				else if (pair.Value.Type == JTokenType.Object) {
+					foreach (var innerPair in (JObject)pair.Value) {
+						if (innerPair.Value.Type == JTokenType.String) {
+							Console.WriteLine("Fuzzing child key: " + innerPair.Key + " (child of " + pair.Key + ")");
+
+							string oldVal = (string)innerPair.Value;
+							obj[pair.Key][innerPair.Key] = "fd'sa";
+
+							if (Fuzz(obj))
+								Console.WriteLine("SQL injection vector: " + innerPair.Key);
+
+							obj[pair.Key][innerPair.Key] = oldVal;
+						}
+					}
+				}
+			}
+		}
 		
+		
+		private static bool Fuzz(JObject obj) {
 			byte[] data = System.Text.Encoding.ASCII.GetBytes ("JSON=" + obj.ToString ());
 
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create ("http://127.0.0.1:8080/Vulnerable.ashx");
@@ -24,23 +64,18 @@ namespace fuzzer
 			req.GetRequestStream ().Write (data, 0, data.Length);
 
 			string resp = string.Empty;
-			WebResponse response;
 			try {
-				response = req.GetResponse ();
+				req.GetResponse ();
 			} catch (WebException ex) {
-
 				using (StreamReader rdr = new StreamReader(ex.Response.GetResponseStream()))
-					resp = rdr.ReadToEnd();
+					resp = rdr.ReadToEnd ();
 
-				if (resp.Contains("syntax error"))
-					Console.WriteLine("SQLi vector found");
-				return;
+				if (resp.Contains ("syntax error"))
+					return true;
+				return false;
 			}
 
-			using (StreamReader rdr = new StreamReader(response.GetResponseStream()))
-				resp = rdr.ReadToEnd();
-
-			Console.WriteLine(resp);
+			return false;
 		}
 	}
 }
