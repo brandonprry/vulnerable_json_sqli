@@ -72,27 +72,35 @@ namespace vulnerable_json_sqli
 			}
 		}
 
-		private bool CreateUser(string username, string password) {
-
+		private bool CreateUser (string username, string password)
+		{
 			NpgsqlConnection conn = new NpgsqlConnection (_connstr);
-			conn.Open();
 
-			NpgsqlCommand cmd = new NpgsqlCommand("INSERT INTO USERS (USERNAME, PASSWORD) VALUES ('" + username + "', '" + password + "');", conn);
-			cmd.ExecuteNonQuery();
+			try {
+				conn.Open ();
 
-			conn.Close();
+				NpgsqlCommand cmd = new NpgsqlCommand ("INSERT INTO USERS (USERNAME, PASSWORD) VALUES ('" + username + "', '" + password + "');", conn);
+				cmd.ExecuteNonQuery ();
+			} finally {
+				conn.Close ();
+			}
+		
 			return true;
 		}
 
-		private bool DeleteUser(string username) {
-
+		private bool DeleteUser (string username)
+		{
 			NpgsqlConnection conn = new NpgsqlConnection (_connstr);
-			conn.Open();
 
-			NpgsqlCommand cmd = new NpgsqlCommand("DELETE FROM USERS WHERE USERNAME='" + username + "';", conn);
-			cmd.ExecuteNonQuery();
+			try {
+				conn.Open ();
 
-			conn.Close();
+				NpgsqlCommand cmd = new NpgsqlCommand ("DELETE FROM USERS WHERE USERNAME='" + username + "';", conn);
+				cmd.ExecuteNonQuery ();
+			} finally {
+				conn.Close ();
+			}
+
 			return true;
 		}
 
@@ -100,20 +108,26 @@ namespace vulnerable_json_sqli
 		{
 
 			NpgsqlConnection conn = new NpgsqlConnection (_connstr);
-			conn.Open ();
-			 
-			NpgsqlCommand cmd = new NpgsqlCommand ("SELECT * FROM USERS;", conn);
-			NpgsqlDataReader rdr = cmd.ExecuteReader ();
-
 			List<JObject> users = new List<JObject> ();
 
-			while (rdr.Read()) {
-				string json = "{ username : \"" + (string)rdr[0] + "\", password : \"" + (string)rdr[1] + "\" }";
-				JObject obj = JObject.Parse(json);
-				users.Add(obj);
+			try {
+				conn.Open ();
+
+			 
+				NpgsqlCommand cmd = new NpgsqlCommand ("SELECT * FROM USERS;", conn);
+				NpgsqlDataReader rdr = cmd.ExecuteReader ();
+
+
+				while (rdr.Read()) {
+					string json = "{ username : \"" + (string)rdr [0] + "\", password : \"" + (string)rdr [1] + "\" }";
+					JObject obj = JObject.Parse (json);
+					users.Add (obj);
+				}
+
+			} finally {
+				conn.Close ();
 			}
 
-			conn.Close();
 			return users;
 		}
 	}

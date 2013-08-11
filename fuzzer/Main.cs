@@ -50,7 +50,6 @@ namespace fuzzer
 			}
 		}
 		
-		
 		private static bool Fuzz(JContainer obj) {
 			byte[] data = System.Text.Encoding.ASCII.GetBytes ("JSON=" + obj.ToString ());
 
