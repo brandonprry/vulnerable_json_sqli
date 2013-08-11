@@ -34,12 +34,7 @@ namespace fuzzer
 					string oldVal = (string)pair.Value;
 					obj[pair.Key] = "fd'sa";
 
-					JContainer par = (JContainer)obj;
-
-					while (par.Parent != null)
-						par = par.Parent;
-
-					if (Fuzz(par))
+					if (Fuzz(obj.Root))
 						Console.WriteLine("SQL injection vector: " + pair.Key);
 
 					obj[pair.Key] = oldVal;
@@ -50,7 +45,7 @@ namespace fuzzer
 			}
 		}
 		
-		private static bool Fuzz(JContainer obj) {
+		private static bool Fuzz(JToken obj) {
 			byte[] data = System.Text.Encoding.ASCII.GetBytes ("JSON=" + obj.ToString ());
 
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create ("http://127.0.0.1:8080/Vulnerable.ashx");
