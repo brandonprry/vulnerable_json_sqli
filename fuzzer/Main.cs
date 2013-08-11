@@ -18,6 +18,11 @@ namespace fuzzer
 
 			JObject obj = JObject.Parse (json);
 
+			IterateAndFuzz(obj);
+		}
+
+		private static void IterateAndFuzz (JObject obj)
+		{
 			foreach (var pair in (JObject)obj.DeepClone()) {
 				if (pair.Value.Type != JTokenType.String && pair.Value.Type != JTokenType.Object) {
 					Console.WriteLine("Skipping JSON key: " + pair.Key);
@@ -29,31 +34,24 @@ namespace fuzzer
 					string oldVal = (string)pair.Value;
 					obj[pair.Key] = "fd'sa";
 
-					if (Fuzz(obj))
+					JContainer par = (JContainer)obj;
+
+					while (par.Parent != null)
+						par = par.Parent;
+
+					if (Fuzz(par))
 						Console.WriteLine("SQL injection vector: " + pair.Key);
 
 					obj[pair.Key] = oldVal;
 				}
 				else if (pair.Value.Type == JTokenType.Object) {
-					foreach (var innerPair in (JObject)pair.Value) {
-						if (innerPair.Value.Type == JTokenType.String) {
-							Console.WriteLine("Fuzzing child key: " + innerPair.Key + " (child of " + pair.Key + ")");
-
-							string oldVal = (string)innerPair.Value;
-							obj[pair.Key][innerPair.Key] = "fd'sa";
-
-							if (Fuzz(obj))
-								Console.WriteLine("SQL injection vector: " + innerPair.Key);
-
-							obj[pair.Key][innerPair.Key] = oldVal;
-						}
-					}
+					IterateAndFuzz((JObject)pair.Value);
 				}
 			}
 		}
 		
 		
-		private static bool Fuzz(JObject obj) {
+		private static bool Fuzz(JContainer obj) {
 			byte[] data = System.Text.Encoding.ASCII.GetBytes ("JSON=" + obj.ToString ());
 
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create ("http://127.0.0.1:8080/Vulnerable.ashx");
